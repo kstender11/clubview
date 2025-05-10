@@ -1,0 +1,22 @@
+version: "3.9"
+services:
+  backend:
+    build: .
+    env_file: .env
+    depends_on:
+      - redis
+      - db
+    ports:
+      - "8000:8000"
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: club
+      POSTGRES_PASSWORD: view
+      POSTGRES_DB: clubview
+    ports:
+      - "5432:5432"

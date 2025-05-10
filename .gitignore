@@ -35,7 +35,21 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-backend/
-node_modules/
+# ───── Python ─────
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
 .env
-.DS_Store
+.env.*
+*.sqlite3
+
+# ───── Firebase Key ─────
+firebase_key.json
+
+# ───── Logs ─────
+*.log
+
+# ───── IDEs ─────
+.vscode/
+.idea/
