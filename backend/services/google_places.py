@@ -15,27 +15,37 @@ def _fetch_nearby(lat, lng, radius=2000):
         f"?location={lat},{lng}&radius={radius}&type=night_club|bar"
         f"&key={cfg.GOOGLE_KEY}"
     )
-    response = requests.get(url, timeout=8).json()
-    google_results = response.get("results", [])
+    
+    try:
+        response = requests.get(url, timeout=8).json()
+        google_results = response.get("results", [])
+        
+        enriched_results = []
+        for place in google_results:
+            # Get Foursquare ID from Google's metadata if available
+            fsq_id = place.get("external_ids", {}).get("foursquare")
+            
+            # Fallback: Search Foursquare using name + coordinates
+            if not fsq_id:
+                fsq_data = enrich_with_foursquare(
+                    name=place.get("name"),
+                    lat=place["geometry"]["location"]["lat"],
+                    lng=place["geometry"]["location"]["lng"]
+                )
+                fsq_id = fsq_data.get("foursquare_id")
 
-    enriched_results = []
-    for place in google_results:
-        name = place.get("name")
-        location = place.get("geometry", {}).get("location", {})
-        lat = location.get("lat")
-        lng = location.get("lng")
+            if fsq_id:
+                place["foursquare_id"] = fsq_id
+                place["categories"] = fsq_data.get("categories")
+                place["is_nightlife"] = fsq_data.get("is_nightlife", False)
+                
+                enriched_results.append(place)
 
-        # Add Foursquare enrichment
-        fsq_data = enrich_with_foursquare(name, lat, lng)
+        return enriched_results
 
-        place["foursquare_id"] = fsq_data.get("foursquare_id")
-        place["categories"] = fsq_data.get("categories")
-        place["website"] = fsq_data.get("website")
-        place["popularity"] = fsq_data.get("popularity")
-
-        enriched_results.append(place)
-
-    return enriched_results
+    except Exception as e:
+        print(f"Google Places error: {e}")
+        return []
 
 def get_google_venues(lat: float, lng: float, radius=2000):
     return get_or_set(

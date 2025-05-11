@@ -42,7 +42,8 @@ def generate_fallback_summary(categories):
 
 def enrich_all_venues():
     print("🔍 Script started...")
-    venues_ref = db.collection("venues")
+    venues_ref = db.collection("cities").document(city).collection("venues")
+
     docs = list(venues_ref.stream())
     print(f"📦 Found {len(docs)} venues.")
 

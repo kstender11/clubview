@@ -38,7 +38,7 @@ def fetch_fsq_id(name: str, lat: float, lng: float):
 
 def add_missing_fsq_ids():
     print("🔍 Scanning venues...")
-    venues_ref = db.collection("venues")
+    venues_ref = db.collection("cities").document(city).collection("venues")
     docs = venues_ref.stream()
 
     for doc in docs:

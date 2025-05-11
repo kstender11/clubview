@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
 """
 scripts/fetch_and_enrich_nearby.py
-Simplified version using Google's native type filtering and stricter legitimacy checks.
+Fetch Google venues and enrich with Foursquare, only storing validated nightlife spots.
 """
+
 import argparse, time, requests, firebase_admin
 from datetime import datetime, timedelta, UTC
 from math import radians, sin, cos, sqrt, atan2
 from typing import Dict, Any
 from firebase_admin import credentials, firestore, initialize_app
 
-from core.config          import get_settings
-from scripts.add_fsq_ids   import fetch_fsq_id
-from scripts.add_hours     import get_google_hours
+from core.config import get_settings
+from scripts.add_fsq_ids import fetch_fsq_id
+from scripts.add_hours import get_google_hours
 from scripts.add_instagram import find_instagram_link
-from services.foursquare   import enrich_with_foursquare
+from services.foursquare import enrich_with_foursquare
+from services.venue_validation import validate_venue  # ✅ Added robust validator
 
 cfg = get_settings()
 
@@ -25,9 +27,11 @@ def distance_m(lat1, lng1, lat2, lng2):
     return int(2*R*atan2(sqrt(a), sqrt(1-a)))
 
 def get_google_details(place_id: str) -> Dict[str, Any]:
-    url = ("https://maps.googleapis.com/maps/api/place/details/json"
-           f"?place_id={place_id}&fields=website,editorial_summary"
-           f"&key={cfg.GOOGLE_KEY}")
+    url = (
+        "https://maps.googleapis.com/maps/api/place/details/json"
+        f"?place_id={place_id}&fields=website,editorial_summary"
+        f"&key={cfg.GOOGLE_KEY}"
+    )
     try:
         res = requests.get(url, timeout=10).json()
         r = res.get("result", {})
@@ -46,10 +50,11 @@ db = firestore.client()
 
 # ───────────────────── Google Places API ─────────────────────
 def fetch_google_nearby(lat: float, lng: float, radius: int = 3000, limit: int = 60):
-    url = ("https://maps.googleapis.com/maps/api/place/nearbysearch/json"
-           f"?location={lat},{lng}&radius={radius}"
-           f"&type=bar|night_club"
-           f"&key={cfg.GOOGLE_KEY}")
+    url = (
+        "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+        f"?location={lat},{lng}&radius={radius}&type=bar|night_club"
+        f"&key={cfg.GOOGLE_KEY}"
+    )
     results, token = [], None
     while len(results) < limit:
         res = requests.get(url + (f"&pagetoken={token}" if token else ""), timeout=10).json()
@@ -60,12 +65,11 @@ def fetch_google_nearby(lat: float, lng: float, radius: int = 3000, limit: int =
         time.sleep(2)
     return results[:limit]
 
-# ─────────────────── Simplify record ─────────────────────
+# ────────────── Simplify record ─────────────────────
 def simplify(place: Dict[str, Any], user_lat: float, user_lng: float) -> Dict[str, Any]:
     loc = place.get("geometry", {}).get("location", {})
     v_lat, v_lng = loc.get("lat"), loc.get("lng")
 
-    # Inference for city/state
     if 33.5 < v_lat < 34.5 and -119 < v_lng < -117:
         city = "Los Angeles"
         state = "CA"
@@ -95,21 +99,12 @@ def simplify(place: Dict[str, Any], user_lat: float, user_lng: float) -> Dict[st
         "state": state,
     }
 
-
-# ────────────── Simple legitimacy check ─────────────────────
-def is_legit_bar(g_types: list[str], fsq_cats: list[str] = [], name: str = "") -> bool:
-    EXCLUDES = {"restaurant", "cafe", "bbq", "pizza", "steakhouse", "breakfast", "hotel"}
-    all_text = " ".join(g_types + fsq_cats + [name]).lower()
-    if any(x in all_text for x in EXCLUDES):
-        return False
-    return any(x in g_types for x in ("bar", "night_club"))
-
 # ────────────── Main enrichment ─────────────────────
 FSQ_COOLDOWN = timedelta(days=7)
 
-def upsert_and_enrich(doc: Dict[str, Any]):
+def upsert_and_enrich(doc: Dict[str, Any], city: str):
     pid = doc["place_id"]
-    ref = db.collection("venues").document(pid)
+    ref = db.collection("cities").document(city).collection("venues").document(pid)
     snap = ref.get()
 
     if not snap.exists:
@@ -120,10 +115,12 @@ def upsert_and_enrich(doc: Dict[str, Any]):
         data = snap.to_dict()
         print(f"↻ Found existing {data['name']}")
 
-    if not is_legit_bar(data.get("types", []), data.get("categories", []), data.get("name")):
+    # ✅ Apply robust nightlife validation
+    if not validate_venue(data):
+        print(f"🚫 Skipping {data['name']} — did not pass nightlife validation.")
         return
 
-    # Foursquare ID
+    # Enrich with Foursquare ID
     if not data.get("foursquare_id"):
         loc = data.get("location", {})
         fsq = fetch_fsq_id(data["name"], loc.get("lat"), loc.get("lng"))
@@ -132,7 +129,7 @@ def upsert_and_enrich(doc: Dict[str, Any]):
             data["foursquare_id"] = fsq
             print(f"   • added Foursquare ID {fsq}")
 
-    # Foursquare enrichment (only if missing or stale)
+    # Foursquare enrichment (if missing or stale)
     last = data.get("last_fsq_refresh")
     if data.get("foursquare_id") and (not last or datetime.now(UTC) - last > FSQ_COOLDOWN):
         enrich = enrich_with_foursquare(data["foursquare_id"])
@@ -162,23 +159,35 @@ def upsert_and_enrich(doc: Dict[str, Any]):
 
 # ────────────── Main CLI ─────────────────────
 def main():
-    p = argparse.ArgumentParser()
-    p.add_argument("lat", type=float)
-    p.add_argument("lng", type=float)
-    p.add_argument("--radius", type=int, default=3000)
-    args = p.parse_args()
+    radius = 3000
+    total = 0
 
-    print("🔍 Fetching Google Places …")
-    places = fetch_google_nearby(args.lat, args.lng, args.radius)
-    print(f"📑 Received {len(places)} Google results\n")
+    for lat, lng in LA_GRID_COORDS:
+        print(f"\n📍 Fetching at ({lat}, {lng}) with radius {radius}")
+        places = fetch_google_nearby(lat, lng, radius)
+        print(f"📑 Received {len(places)} results")
 
-    for place in places:
-        simplified = simplify(place, args.lat, args.lng)
-        if is_legit_bar(simplified["types"], simplified["categories"], simplified["name"]):
-            upsert_and_enrich(simplified)
+        for place in places:
+            simplified = simplify(place, lat, lng)
+            upsert_and_enrich(simplified, simplified["city"])
+            total += 1
             time.sleep(0.2)
 
-    print("\n✅ Finished fetching & enriching.")
+    print(f"\n✅ Finished populating LA with {total} venues enriched.")
+
+LA_GRID_COORDS = [
+    (34.0219, -118.4814),  # Santa Monica
+    (34.0469, -118.4421),  # Westwood
+    (34.0635, -118.3581),  # West Hollywood
+    (34.0736, -118.3036),  # Koreatown
+    (34.0455, -118.2510),  # Downtown LA
+    (34.0054, -118.2859),  # USC
+    (34.0800, -118.2000),  # Highland Park
+    (34.1400, -118.1500),  # Pasadena
+    (33.9617, -118.3531),  # Inglewood
+    (33.9456, -118.2417),  # Compton
+    (34.1016, -118.3380),  # Hollywood Hills
+]
 
 if __name__ == "__main__":
     main()

@@ -27,7 +27,7 @@ def find_instagram_link(website_url):
 
 def enrich_instagram():
     print("🔍 Starting Instagram enrichment...")
-    venues_ref = db.collection("venues")
+    venues_ref = db.collection("cities").document(city).collection("venues")
     docs = list(venues_ref.stream())
     print(f"📦 Found {len(docs)} venues.")
 

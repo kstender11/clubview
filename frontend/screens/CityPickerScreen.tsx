@@ -7,35 +7,36 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useCity } from './CityContext'; // 🔑
+import { useCity } from './CityContext'; // 🔑 import context hook
 
-export default function CityPickerScreen({ navigation, onCitySelected }: any) {
-    const cities = ['Los Angeles', 'Scottsdale', 'San Francisco'];
-  
-    return (
-      <SafeAreaView style={styles.container}>
-        <ScrollView contentContainerStyle={styles.inner}>
-          <Text style={styles.title}>📍 Where are you partying?</Text>
-          <Text style={styles.subtitle}>
-            We couldn’t get your location. Choose a city to continue.
-          </Text>
-  
-          {cities.map(city => (
-            <TouchableOpacity
-              key={city}
-              style={styles.cityButton}
-              onPress={() => {
-                onCitySelected(); // lift state up
-              }}
-            >
-              <Text style={styles.cityText}>📍 {city}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
-  
+export default function CityPickerScreen({ navigation }: any) {
+  const { setSelectedCity } = useCity(); // 🔑 grab setter from context
+  const cities = ['Los Angeles', 'Scottsdale', 'San Francisco'];
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.inner}>
+        <Text style={styles.title}>📍 Where are you partying?</Text>
+        <Text style={styles.subtitle}>
+          We couldn’t get your location. Choose a city to continue.
+        </Text>
+
+        {cities.map(city => (
+          <TouchableOpacity
+            key={city}
+            style={styles.cityButton}
+            onPress={() => {
+              setSelectedCity(city);      // ✅ save to context
+              navigation.replace('Home'); // ✅ jump to Home
+            }}
+          >
+            <Text style={styles.cityText}>📍 {city}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
 
 const styles = StyleSheet.create({
   container: {

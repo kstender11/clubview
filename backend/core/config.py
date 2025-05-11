@@ -1,11 +1,17 @@
 from pydantic_settings import BaseSettings
+from pydantic import ConfigDict
+
 
 class Settings(BaseSettings):
     GOOGLE_KEY: str
-    FOURSQUARE_API_KEY: str  # ← Add this line
+    FOURSQUARE_API_KEY: str
     APIS_ENABLED: bool = True
     CACHE_TTL_HOURS: int = 12
     DEV_MODE: bool = False
+
+    # --- add this ---
+    INSTAGRAM_TOKEN: str | None = None
+
 
     class Config:
         env_file = ".env"

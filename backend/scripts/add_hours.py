@@ -34,7 +34,7 @@ def get_google_hours(place_id):
 
 def add_hours_to_venues():
     print("\n🕒 Starting hours enrichment...")
-    venues_ref = db.collection("venues")
+    venues_ref = db.collection("cities").document(city).collection("venues")
     docs = list(venues_ref.stream())
     print(f"📦 Found {len(docs)} venues.")
 

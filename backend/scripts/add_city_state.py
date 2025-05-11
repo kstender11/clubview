@@ -9,7 +9,7 @@ if not firebase_admin._apps:
 db = firestore.client()
 
 def update_city_state():
-    venues_ref = db.collection("venues")
+    venues_ref = db.collection("cities").document(city).collection("venues")
     docs = list(venues_ref.stream())
 
     for doc in docs:

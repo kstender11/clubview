@@ -1,44 +1,44 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter
 from typing import Optional
 from services.firestore_utils import db
-from services import google_places, foursquare, instagram
-from services.cache import get_or_set
+from geopy.distance import geodesic
 
 router = APIRouter()
 
 @router.get("/venues/discover")
 def discover_venues(
-    city: str = "Los Angeles",
+    city: str,
+    lat: float,
+    lng: float,
     category: Optional[str] = None,
-    last_doc_id: Optional[str] = None,
-    radius: int = 3000
+    limit: int = 20,
 ):
-    venues_ref = db.collection("venues")
-    query = venues_ref.where("city", "==", city)
+    venues_ref = db.collection("cities").document(city).collection("venues")
+    docs = venues_ref.stream()
 
-    if category:
-        query = query.where("categories", "array_contains", category)
+    user_coords = (lat, lng)
+    venues = []
 
-    query = query.order_by("distance").limit(20)
+    for doc in docs:
+        data = doc.to_dict()
+        venue_coords = (
+            data.get("location", {}).get("lat"),
+            data.get("location", {}).get("lng")
+        )
 
-    if last_doc_id:
-        last_doc = venues_ref.document(last_doc_id).get()
-        if last_doc.exists:
-            query = query.start_after(last_doc)
+        if None in venue_coords:
+            continue
 
-    results = query.stream()
-    venues = [doc.to_dict() | {"id": doc.id} for doc in results]
+        # Optional category filter
+        if category and category.lower() not in " ".join(data.get("categories", [])).lower():
+            continue
 
-    # Fallback: expand radius
-    if len(venues) < 20 and radius < 8000:
-        return discover_venues(city, category, last_doc_id, radius + 2000)
+        # Distance from user
+        dist_meters = geodesic(user_coords, venue_coords).meters
+        data["distance"] = dist_meters
+        venues.append(data | {"id": doc.id})
 
-    # Fallback: drop radius if category filter is too strict
-    if len(venues) < 20 and category:
-        fallback_query = venues_ref.where("city", "==", city)\
-                                   .where("categories", "array_contains", category)\
-                                   .limit(20)
-        fallback_results = fallback_query.stream()
-        venues = [doc.to_dict() | {"id": doc.id} for doc in fallback_results]
+    # Sort by distance
+    venues.sort(key=lambda v: v["distance"])
 
-    return venues
+    return venues[:limit]

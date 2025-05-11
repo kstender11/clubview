@@ -32,7 +32,7 @@ def has_nested_field(data, field_path):
 
 def audit_venues():
     print("\n📝 Starting audit of venue metadata...")
-    venues_ref = db.collection("venues")
+    venues_ref = db.collection("cities").document(city).collection("venues")
     docs = list(venues_ref.stream())
     print(f"📦 Found {len(docs)} venues.")
 

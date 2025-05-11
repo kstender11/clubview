@@ -1,92 +1,57 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, Image, ScrollView, TouchableOpacity,
   ActivityIndicator, useWindowDimensions,
 } from 'react-native';
-import * as Location from 'expo-location';
-import AsyncStorage  from '@react-native-async-storage/async-storage';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import Feather  from 'react-native-vector-icons/Feather';
+import Feather from 'react-native-vector-icons/Feather';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { useCity } from './CityContext';
 
-/* ——— static sample data ——— */
-const filters = [
-  { label: 'Trending',  icon: 'flame' },
-  { label: 'Cocktails', icon: 'wine'  },
-  { label: 'Music',     icon: 'musical-notes' },
-];
-
-const heroPick = {
-  name : 'Bar Lis',
-  image: require('../assets/sample-hero.jpg'),
-  tags : ['Lively', 'Trendy'],
-};
-
-const nearby = [
-  { id:'1', name:'Roccos',    image:require('../assets/sample1.jpg'), distance:'0.4 mi', tags:['Lively','Dancing'] },
-  { id:'2', name:'Wolfsglen', image:require('../assets/sample2.jpg'), distance:'0.2 mi', tags:['Chill','Cocktails'] },
-  { id:'3', name:'Poppy',     image:require('../assets/sample3.jpg'), distance:'2.6 mi', tags:['DJ','Dancing'] },
-];
-/* ———————————————————————— */
+const filters = [ /* … same … */ ];
+const heroPick  = { /* … same … */ };
+const API_URL   = 'http://192.168.1.179:8000/api/venues/discover';
 
 export default function HomeScreen() {
-  const [phase, setPhase] = useState<'checking' | 'denied' | 'granted'>('checking');
-  const { width }   = useWindowDimensions();
-  const insets      = useSafeAreaInsets();
-  const CARD_WIDTH  = width - 48;
-  const HERO_H      = CARD_WIDTH * 0.6;
-  const COMPACT_H   = 120;
+  const { selectedCity, userLocation } = useCity();
+  const [venues,  setVenues]  = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  /* ask for permission (runs once) */
+  const { width }  = useWindowDimensions();
+  const insets     = useSafeAreaInsets();
+  const CARD_W     = width - 48;
+  const HERO_H     = CARD_W * 0.6;
+  const COMPACT_H  = 120;
+
+  /* fetch when we have coords */
   useEffect(() => {
-    (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status === 'granted') {
-        setPhase('granted');
-      } else {
-        const manual = await AsyncStorage.getItem('manualCity');
-        setPhase(manual ? 'granted' : 'denied');
-      }
-    })();
-  }, []);
+    if (!userLocation) return;         // still waiting for coords (GPS or fallback)
+      console.log('📍 userLocation =', userLocation);
+    setLoading(true);
 
-  /* ——— 1. spinner while checking ——— */
-  if (phase === 'checking') {
+    const url = `${API_URL}?city=${selectedCity}&lat=${userLocation.lat}&lng=${userLocation.lng}&radius=4000`;
+    console.log('📡', url);
+
+    fetch(url)
+      .then(r => r.json())
+      .then(setVenues)
+      .catch(err => {
+        console.error('❌ fetch', err);
+        setVenues([]);
+      })
+      .finally(() => setLoading(false));
+  }, [userLocation]);
+
+  /* spinner while coords or data pending */
+  if (!userLocation || loading) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator size="large" color="#9FDDE1" />
+        <Text style={{ color:'#9FDDE1', marginTop:12 }}>Loading venues…</Text>
       </View>
     );
   }
 
-  /* ——— 2. fallback picker when denied & no saved city ——— */
-  if (phase === 'denied') {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.inner}>
-          <Text style={styles.h1}>📍 Where are you partying?</Text>
-          <Text style={styles.info}>
-            We couldn’t get your location. Choose a city to continue.
-          </Text>
-
-          {['Los Angeles', 'Scottsdale', 'San Francisco'].map(city => (
-            <TouchableOpacity
-              key={city}
-              style={styles.cityBtn}
-              onPress={async () => {
-                await AsyncStorage.setItem('manualCity', city);
-                setPhase('granted');           // re-render feed
-              }}
-            >
-              <Text style={styles.cityTxt}>📍 {city}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
-
-  /* ——— 3. permission OK → render the real feed ——— */
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -94,93 +59,56 @@ export default function HomeScreen() {
         contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: 32 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Title */}
-        <Text style={[styles.h1, { marginTop: 8 }]}>Tonight’s Top Picks</Text>
+        {/* top picks, filters … */}
 
-        {/* Filter row */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-          {filters.map(f => (
-            <View key={f.label} style={styles.chip}>
-              <Ionicons name={f.icon} size={14} color="#9FDDE1" />
-              <Text style={styles.chipLabel}>{f.label}</Text>
-            </View>
-          ))}
-          <View style={styles.filterChip}>
-            <Feather name="sliders" size={16} color="#000" />
-            <Text style={styles.filterLabel}>Filters</Text>
-          </View>
-        </ScrollView>
-
-        {/* Hero card */}
-        <TouchableOpacity
-          activeOpacity={0.85}
-          style={[styles.heroCard, { width: CARD_WIDTH, height: HERO_H }]}
-        >
-          <Image source={heroPick.image} style={styles.heroImage} />
-          <View style={styles.heroOverlay}>
-            <Text style={styles.heroTitle}>{heroPick.name.toUpperCase()}</Text>
-            <View style={styles.tagRow}>
-              {heroPick.tags.map(tag => (
-                <View key={tag} style={styles.tagChip}>
-                  <Text style={styles.tagText}>{tag.toUpperCase()}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        </TouchableOpacity>
-
-        {/* Nearby */}
         <Text style={styles.h2}>Nearby</Text>
 
-        {nearby.map(item => (
-          <TouchableOpacity
-            key={item.id}
-            activeOpacity={0.85}
-            style={[styles.compactCard, { width: CARD_WIDTH, height: COMPACT_H }]}
-          >
-            <Image source={item.image} style={[styles.compactImage, { height: COMPACT_H }]} />
-            <View style={styles.compactInfo}>
-              <Text style={styles.compactName}>{item.name}</Text>
-              <Text style={styles.compactDistance}>{item.distance}</Text>
-              <View style={styles.tagRow}>
-                {item.tags.map(t => (
-                  <View key={t} style={styles.tagChipSmall}>
-                    <Text style={styles.tagTextSmall}>{t.toUpperCase()}</Text>
-                  </View>
-                ))}
+        {venues.length === 0 ? (
+          <Text style={styles.info}>No spots within 4 km of {selectedCity} yet.</Text>
+        ) : (
+          venues.map((v: any) => (
+            <TouchableOpacity
+              key={v.id}
+              activeOpacity={0.85}
+              style={[styles.compactCard, { width: CARD_W, height: COMPACT_H }]}
+            >
+              <Image source={require('../assets/sample1.jpg')}
+                     style={[styles.compactImage, { height: COMPACT_H }]} />
+              <View style={styles.compactInfo}>
+                <Text style={styles.compactName}>{v.name}</Text>
+                <Text style={styles.compactDistance}>{(v.distance / 1609).toFixed(1)} mi</Text>
+                <View style={styles.tagRow}>
+                  {(v.categories || []).slice(0,3).map((tag:string) => (
+                    <View key={tag} style={styles.tagChipSmall}>
+                      <Text style={styles.tagTextSmall}>{tag.toUpperCase()}</Text>
+                    </View>
+                  ))}
+                </View>
               </View>
-            </View>
-          </TouchableOpacity>
-        ))}
+            </TouchableOpacity>
+          ))
+        )}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-/* ——— styles ——— */
+
 const styles = StyleSheet.create({
   safeArea:{ flex:1, backgroundColor:'#000' },
   container:{ flex:1, backgroundColor:'#000', paddingHorizontal:24 },
   loading:{ flex:1, justifyContent:'center', alignItems:'center', backgroundColor:'#000' },
-
-  /* fallback */
   inner:{ flexGrow:1, justifyContent:'center', alignItems:'center', paddingVertical:60 },
   info:{ color:'#AAA', fontSize:15, textAlign:'center', marginBottom:24, fontFamily:'Literata_400Regular' },
   cityBtn:{ backgroundColor:'#9FDDE1', borderRadius:30, paddingVertical:12, paddingHorizontal:40, marginBottom:16 },
   cityTxt:{ color:'#000', fontSize:16, fontWeight:'600' },
-
-  /* typography */
   h1:{ color:'#FFF', fontSize:32, fontFamily:'Literata_400Regular', marginBottom:12 },
   h2:{ color:'#FFF', fontSize:28, fontFamily:'Literata_400Regular', marginVertical:20 },
-
-  /* chips */
   filterRow:{ gap:12, paddingVertical:8 },
   chip:{ flexDirection:'row', backgroundColor:'#222', borderRadius:20, paddingHorizontal:14, paddingVertical:6, alignItems:'center' },
   chipLabel:{ color:'#9FDDE1', marginLeft:6, fontSize:14 },
   filterChip:{ flexDirection:'row', backgroundColor:'#9FDDE1', borderRadius:20, paddingHorizontal:16, paddingVertical:6, alignItems:'center' },
   filterLabel:{ color:'#000', marginLeft:6, fontSize:14, fontWeight:'600' },
-
-  /* hero */
   heroCard:{ borderRadius:12, overflow:'hidden', marginVertical:12 },
   heroImage:{ width:'100%', height:'100%' },
   heroOverlay:{ ...StyleSheet.absoluteFillObject, justifyContent:'flex-end', padding:16 },
@@ -188,8 +116,6 @@ const styles = StyleSheet.create({
   tagRow:{ flexDirection:'row', gap:8, marginTop:4 },
   tagChip:{ backgroundColor:'#444', borderRadius:14, paddingHorizontal:10, paddingVertical:4 },
   tagText:{ color:'#9FDDE1', fontSize:12 },
-
-  /* nearby cards */
   compactCard:{ backgroundColor:'#1C1C1E', borderRadius:16, flexDirection:'row', alignItems:'center', marginBottom:18 },
   compactImage:{ width:120, resizeMode:'cover' },
   compactInfo:{ flex:1, paddingHorizontal:14, paddingVertical:10 },

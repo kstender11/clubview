@@ -14,7 +14,6 @@ if not firebase_admin._apps:
 db = firestore.client()
 
 def add_venue_to_firestore(data: dict):
-    # Use Google Place ID as document ID (globally unique)
-    doc_ref = db.collection("venues").document(data["place_id"])
-    doc_ref.set(data, merge=True)  # merge=True allows updating existing docs
-
+    city = data.get("city", "Unknown")  # fallback if city is somehow missing
+    doc_ref = db.collection("cities").document(city).collection("venues").document(data["place_id"])
+    doc_ref.set(data, merge=True)

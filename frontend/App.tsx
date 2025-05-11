@@ -1,29 +1,47 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import * as SplashScreen from 'expo-splash-screen';
+import { useFonts, Literata_400Regular } from '@expo-google-fonts/literata';
+import { CityProvider } from './screens/CityContext';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import WelcomeScreen   from './screens/WelcomeScreen';
-import LoginScreen     from './screens/LoginScreen';
-import SignUpScreen    from './screens/SignUpScreen';
+import WelcomeScreen from './screens/WelcomeScreen';
+import LoginScreen from './screens/LoginScreen';
+import SignUpScreen from './screens/SignUpScreen';
 import VerifyCodeScreen from './screens/VerifyCodeScreen';
-import HomeScreen      from './screens/HomeScreen';
-import { useFonts, Literata_400Regular } from '@expo-google-fonts/literata';
-import AppLoading from 'expo-app-loading';
+import HomeScreen from './screens/HomeScreen';
+import BootstrapScreen from './screens/BootstrapScreen';
+import CityPickerScreen from './screens/CityPickerScreen';
 
 const Stack = createNativeStackNavigator();
 
+SplashScreen.preventAutoHideAsync();
+
 export default function App() {
   const [fontsLoaded] = useFonts({ Literata_400Regular });
-  if (!fontsLoaded) return <AppLoading />;
+
+  useEffect(() => {
+    if (fontsLoaded) SplashScreen.hideAsync();
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded) return null;
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Welcome" component={WelcomeScreen} />
-        <Stack.Screen name="Login"   component={LoginScreen} />
-        <Stack.Screen name="SignUp"  component={SignUpScreen} />
-        <Stack.Screen name="Verify"  component={VerifyCodeScreen} />
-        <Stack.Screen name="Home"    component={HomeScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <CityProvider>
+      <NavigationContainer>
+        <Stack.Navigator
+          initialRouteName="Bootstrap"          // 👈 add this line
+          screenOptions={{ headerShown: false }}
+        >
+          <Stack.Screen name="Bootstrap" component={BootstrapScreen} />
+          <Stack.Screen name="CityPicker" component={CityPickerScreen} />
+          <Stack.Screen name="Home" component={HomeScreen} />
+          {/* Leave the auth screens in the stack; you just won't start on them while testing */}
+          <Stack.Screen name="Welcome" component={WelcomeScreen} />
+          <Stack.Screen name="Login"   component={LoginScreen} />
+          <Stack.Screen name="SignUp"  component={SignUpScreen} />
+          <Stack.Screen name="Verify"  component={VerifyCodeScreen} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </CityProvider>
   );
-}
+}  
