@@ -11,6 +11,7 @@ def discover_venues(
     lat: float,
     lng: float,
     category: Optional[str] = None,
+    skip: int = 0,
     limit: int = 20,
 ):
     venues_ref = db.collection("cities").document(city).collection("venues")
@@ -29,16 +30,12 @@ def discover_venues(
         if None in venue_coords:
             continue
 
-        # Optional category filter
         if category and category.lower() not in " ".join(data.get("categories", [])).lower():
             continue
 
-        # Distance from user
         dist_meters = geodesic(user_coords, venue_coords).meters
         data["distance"] = dist_meters
         venues.append(data | {"id": doc.id})
 
-    # Sort by distance
     venues.sort(key=lambda v: v["distance"])
-
-    return venues[:limit]
+    return venues[skip : skip + limit]

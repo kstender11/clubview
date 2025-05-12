@@ -1,95 +1,148 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, Image, ScrollView, TouchableOpacity,
-  ActivityIndicator, useWindowDimensions,
+  View, Text, StyleSheet, Image, TouchableOpacity,
+  ActivityIndicator, useWindowDimensions, FlatList, RefreshControl
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import Feather from 'react-native-vector-icons/Feather';
-import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useCity } from './CityContext';
 import { API_BASE_URL } from '@env';
 
-const filters = [ /* … same … */ ];
-const heroPick  = { /* … same … */ };
+interface Venue {
+  id: string;
+  name: string;
+  distance: number;
+  categories?: string[];
+}
+
 const API_URL = `${API_BASE_URL}/api/venues/discover`;
+const PAGE_SIZE = 10;
 
 export default function HomeScreen() {
   const { selectedCity, userLocation } = useCity();
-  const [venues,  setVenues]  = useState([]);
+  const [venues, setVenues] = useState<Venue[]>([]);
+  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
 
-  const { width }  = useWindowDimensions();
-  const insets     = useSafeAreaInsets();
-  const CARD_W     = width - 48;
-  const HERO_H     = CARD_W * 0.6;
-  const COMPACT_H  = 120;
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const CARD_W = width - 48;
+  const COMPACT_H = 120;
 
-  /* fetch when we have coords */
-  useEffect(() => {
-    if (!userLocation) return;         // still waiting for coords (GPS or fallback)
-      console.log('📍 userLocation =', userLocation);
+  const fetchVenues = useCallback(async (pageNum = 0, isRefreshing = false) => {
+    if (!userLocation || loading) return;
+    
     setLoading(true);
+    if (isRefreshing) setRefreshing(true);
 
-    const url = `${API_URL}?city=${selectedCity}&lat=${userLocation.lat}&lng=${userLocation.lng}&radius=50000`;
-    console.log('📡', url);
+    try {
+      const url = `${API_URL}?city=${selectedCity}&lat=${userLocation.lat}&lng=${userLocation.lng}&radius=50000&skip=${pageNum * PAGE_SIZE}&limit=${PAGE_SIZE}`;
+      const response = await fetch(url);
+      const data: Venue[] = await response.json();
 
-    fetch(url)
-      .then(r => r.json())
-      .then(setVenues)
-      .catch(err => {
-        console.error('❌ fetch', err);
-        setVenues([]);
-      })
-      .finally(() => setLoading(false));
-  }, [userLocation]);
+      if (data.length < PAGE_SIZE) setHasMore(false);
+      
+      if (isRefreshing || pageNum === 0) {
+        setVenues(data);
+      } else {
+        setVenues(prev => [...prev, ...data]);
+      }
+      setPage(pageNum);
+    } catch (error) {
+      console.error('Failed to fetch venues:', error);
+    } finally {
+      setLoading(false);
+      if (isRefreshing) setRefreshing(false);
+    }
+  }, [userLocation, selectedCity, loading]);
 
-  /* spinner while coords or data pending */
-  if (!userLocation || loading) {
+  useEffect(() => {
+    if (userLocation) fetchVenues(0);
+  }, [userLocation, selectedCity]);
+
+  const onRefresh = useCallback(() => {
+    setHasMore(true);
+    fetchVenues(0, true);
+  }, [fetchVenues]);
+
+  const loadMore = useCallback(() => {
+    if (!loading && hasMore) {
+      fetchVenues(page + 1);
+    }
+  }, [loading, hasMore, page, fetchVenues]);
+
+  const renderItem = ({ item }: { item: Venue }) => (
+    <TouchableOpacity
+      key={item.id}
+      activeOpacity={0.85}
+      style={[styles.compactCard, { width: CARD_W, height: COMPACT_H }]}
+    >
+      <Image 
+        source={require('../assets/sample1.jpg')}
+        style={[styles.compactImage, { height: COMPACT_H }]} 
+      />
+      <View style={styles.compactInfo}>
+        <Text style={styles.compactName}>{item.name}</Text>
+        <Text style={styles.compactDistance}>{(item.distance / 1609).toFixed(1)} mi</Text>
+        <View style={styles.tagRow}>
+          {(item.categories || []).slice(0,3).map((tag: string) => (
+            <View key={tag} style={styles.tagChipSmall}>
+              <Text style={styles.tagTextSmall}>{tag.toUpperCase()}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
+  if (!userLocation) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator size="large" color="#9FDDE1" />
-        <Text style={{ color:'#9FDDE1', marginTop:12 }}>Loading venues…</Text>
+        <Text style={{ color:'#9FDDE1', marginTop:12 }}>Getting your location...</Text>
       </View>
     );
   }
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: 32 }}
+      <FlatList
+        data={venues}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={{
+          paddingTop: insets.top + 8,
+          paddingBottom: 32,
+          paddingHorizontal: 24
+        }}
+        ListHeaderComponent={
+          <>
+            <Text style={styles.h2}>Nearby</Text>
+          </>
+        }
+        ListEmptyComponent={
+          !loading ? (
+            <Text style={styles.info}>No spots within 30 mi of {selectedCity} yet.</Text>
+          ) : null
+        }
+        ListFooterComponent={
+          loading && !refreshing && venues.length > 0 ? (
+            <ActivityIndicator size="small" color="#9FDDE1" style={{ marginVertical: 20 }} />
+          ) : null
+        }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#9FDDE1"
+            colors={['#9FDDE1']}
+          />
+        }
         showsVerticalScrollIndicator={false}
-      >
-        {/* top picks, filters … */}
-
-        <Text style={styles.h2}>Nearby</Text>
-
-        {venues.length === 0 ? (
-          <Text style={styles.info}>No spots within 30 mi of {selectedCity} yet.</Text>
-        ) : (
-          venues.map((v: any) => (
-            <TouchableOpacity
-              key={v.id}
-              activeOpacity={0.85}
-              style={[styles.compactCard, { width: CARD_W, height: COMPACT_H }]}
-            >
-              <Image source={require('../assets/sample1.jpg')}
-                     style={[styles.compactImage, { height: COMPACT_H }]} />
-              <View style={styles.compactInfo}>
-                <Text style={styles.compactName}>{v.name}</Text>
-                <Text style={styles.compactDistance}>{(v.distance / 1609).toFixed(1)} mi</Text>
-                <View style={styles.tagRow}>
-                  {(v.categories || []).slice(0,3).map((tag:string) => (
-                    <View key={tag} style={styles.tagChipSmall}>
-                      <Text style={styles.tagTextSmall}>{tag.toUpperCase()}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            </TouchableOpacity>
-          ))
-        )}
-      </ScrollView>
+      />
     </SafeAreaView>
   );
 }

@@ -1,0 +1,7 @@
+fastapi
+pydantic-settings
+uvicorn
+firebase-admin
+requests
+python-dotenv
+geopy
