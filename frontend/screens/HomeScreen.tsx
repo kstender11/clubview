@@ -65,7 +65,7 @@ export default function HomeScreen() {
         <Text style={styles.h2}>Nearby</Text>
 
         {venues.length === 0 ? (
-          <Text style={styles.info}>No spots within 4 km of {selectedCity} yet.</Text>
+          <Text style={styles.info}>No spots within 30 mi of {selectedCity} yet.</Text>
         ) : (
           venues.map((v: any) => (
             <TouchableOpacity
