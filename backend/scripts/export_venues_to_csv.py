@@ -13,7 +13,7 @@ if not firebase_admin._apps:
     initialize_app(cred)
 db = firestore.client()
 
-CITY = "Los Angeles"
+CITY = "San Francisco"
 OUTPUT_CSV = "venues_export.csv"
 
 def flatten_field(value):

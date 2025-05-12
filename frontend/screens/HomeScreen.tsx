@@ -30,7 +30,7 @@ export default function HomeScreen() {
       console.log('📍 userLocation =', userLocation);
     setLoading(true);
 
-    const url = `${API_URL}?city=${selectedCity}&lat=${userLocation.lat}&lng=${userLocation.lng}&radius=4000`;
+    const url = `${API_URL}?city=${selectedCity}&lat=${userLocation.lat}&lng=${userLocation.lng}&radius=50000`;
     console.log('📡', url);
 
     fetch(url)
