@@ -15,6 +15,12 @@ WHITELIST = {
     "el cid",
     "the edmon",
     "shrine room karaoke | la",
+    "rocco’s weho",
+    "poppy",
+    "perch",
+    "keys",
+    "wolfsglen",
+    "ōwa",
 }
 
 
@@ -94,47 +100,49 @@ def _has_late_hours(hours: Optional[dict]) -> bool:
     return False
 
 # ───────────────────  MAIN  ────────────────────
+# services/venue_validation.py
+
 def validate_venue(v: dict) -> bool:
     name   = v.get("name", "").lower()
     types  = [t.lower() for t in v.get("types", [])]
     cats   = [c.lower() for c in v.get("categories", [])]
     site   = v.get("website", "")
-    hours  = v.get("hours")                     # dict or None
+    hours  = v.get("hours")  # dict or None
     blob   = " ".join([name, *types, *cats])
 
     # 0. Whitelist wins
     if name in WHITELIST:
         return True
 
-    # 1. Hard negative if plain bad keyword & no nightlife cues
+    # 1. Hard negative: if a bad keyword is present and NO nightlife cues
     if any(bad in blob for bad in NEG_KW_PLAIN) and _count_kw(blob) == 0:
         return False
 
-    # Beauty‑salon special rule
+    # 2. Beauty salon exclusion
     if _is_beauty_salon(blob):
         return False
 
     score = 0
 
-    # 2. Foursquare flag
+    # 3. Foursquare "nightlife" flag
     if v.get("is_nightlife"):
         score += 40
 
-    # 3. Google place types
+    # 4. Google bar/night_club types
     if any(t in GOOGLE_NIGHTLIFE_TYPES for t in types):
         score += 25
 
-    # 4. Name & category keywords
+    # 5. Name & category keywords
     name_hits = _count_kw(name)
     score += min(1, name_hits) * 20
     score += max(0, name_hits - 1) * 5
     score += _count_kw(" ".join(cats)) * 10
 
-    # 5. Instagram bio cues
+    # 6. Instagram bio presence
     if site and validate_instagram(site):
         score += 15
 
-    # 6. Late‑night hours bonus
+    # 7. Late night hours
     if _has_late_hours(hours):
         score += 10
 
