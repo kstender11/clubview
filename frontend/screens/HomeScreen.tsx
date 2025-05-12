@@ -6,6 +6,10 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCity } from './CityContext';
 import { API_BASE_URL } from '@env';
+import FilterBar from './FilterBar';
+
+
+
 
 interface Venue {
   id: string;
@@ -24,6 +28,7 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
 
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -32,7 +37,7 @@ export default function HomeScreen() {
 
   const fetchVenues = useCallback(async (pageNum = 0, isRefreshing = false) => {
     if (!userLocation || loading) return;
-    
+
     setLoading(true);
     if (isRefreshing) setRefreshing(true);
 
@@ -42,7 +47,7 @@ export default function HomeScreen() {
       const data: Venue[] = await response.json();
 
       if (data.length < PAGE_SIZE) setHasMore(false);
-      
+
       if (isRefreshing || pageNum === 0) {
         setVenues(data);
       } else {
@@ -112,14 +117,15 @@ export default function HomeScreen() {
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{
-          paddingTop: insets.top + 8,
+          paddingTop: 8, // Reduced from insets.top + 8 since we handle it in ListHeaderComponent
           paddingBottom: 32,
           paddingHorizontal: 24
         }}
         ListHeaderComponent={
-          <>
+          <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
             <Text style={styles.h2}>Nearby</Text>
-          </>
+            <FilterBar selected={activeFilter} onSelect={setActiveFilter} />
+          </View>
         }
         ListEmptyComponent={
           !loading ? (
@@ -147,7 +153,6 @@ export default function HomeScreen() {
   );
 }
 
-
 const styles = StyleSheet.create({
   safeArea:{ flex:1, backgroundColor:'#000' },
   container:{ flex:1, backgroundColor:'#000', paddingHorizontal:24 },
@@ -157,7 +162,14 @@ const styles = StyleSheet.create({
   cityBtn:{ backgroundColor:'#9FDDE1', borderRadius:30, paddingVertical:12, paddingHorizontal:40, marginBottom:16 },
   cityTxt:{ color:'#000', fontSize:16, fontWeight:'600' },
   h1:{ color:'#FFF', fontSize:32, fontFamily:'Literata_400Regular', marginBottom:12 },
-  h2:{ color:'#FFF', fontSize:28, fontFamily:'Literata_400Regular', marginVertical:20 },
+  h2: {
+    color: '#FFF',
+    fontSize: 28,
+    fontFamily: 'Literata_400Regular',
+    marginBottom: 12,  // Reduced from 20
+    textAlign: 'left',
+    lineHeight: 32,    // Added to control vertical space
+  },
   filterRow:{ gap:12, paddingVertical:8 },
   chip:{ flexDirection:'row', backgroundColor:'#222', borderRadius:20, paddingHorizontal:14, paddingVertical:6, alignItems:'center' },
   chipLabel:{ color:'#9FDDE1', marginLeft:6, fontSize:14 },
@@ -167,14 +179,58 @@ const styles = StyleSheet.create({
   heroImage:{ width:'100%', height:'100%' },
   heroOverlay:{ ...StyleSheet.absoluteFillObject, justifyContent:'flex-end', padding:16 },
   heroTitle:{ color:'#FFF', fontSize:24, fontFamily:'Literata_400Regular' },
-  tagRow:{ flexDirection:'row', gap:8, marginTop:4 },
   tagChip:{ backgroundColor:'#444', borderRadius:14, paddingHorizontal:10, paddingVertical:4 },
   tagText:{ color:'#9FDDE1', fontSize:12 },
-  compactCard:{ backgroundColor:'#1C1C1E', borderRadius:16, flexDirection:'row', alignItems:'center', marginBottom:18 },
-  compactImage:{ width:120, resizeMode:'cover' },
-  compactInfo:{ flex:1, paddingHorizontal:14, paddingVertical:10 },
-  compactName:{ color:'#FFF', fontSize:20, fontFamily:'Literata_400Regular' },
-  compactDistance:{ color:'#AAA', fontSize:12, marginTop:2 },
-  tagChipSmall:{ backgroundColor:'#444', borderRadius:12, paddingHorizontal:8, paddingVertical:2, marginRight:6, marginTop:6 },
-  tagTextSmall:{ color:'#9FDDE1', fontSize:10 },
+  compactCard: {
+    backgroundColor: '#1C1C1E',
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 18,
+    overflow: 'hidden',
+  },
+  compactInfo: {
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  compactName: {
+    color: '#FFF',
+    fontSize: 18,
+    fontFamily: 'Literata_400Regular',
+    maxWidth: '100%',
+  },
+  compactDistance: {
+    color: '#AAA',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  compactImage: {
+    width: 120,
+    resizeMode: 'cover',
+  },
+  tagRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+    maxWidth: '100%',
+  },
+  tagChipSmall: {
+    backgroundColor: '#444',
+    borderRadius: 12,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginRight: 4,
+    marginTop: 4,
+  },
+  tagTextSmall: {
+    color: '#9FDDE1',
+    fontSize: 10,
+  },
+  headerContainer: {
+    paddingLeft: 24, // Matches contentContainerStyle paddingHorizontal
+    paddingBottom: 8,
+    alignSelf: 'flex-start', // Ensures title stays left-aligned 
+  },
 });

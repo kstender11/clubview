@@ -4,6 +4,8 @@ import { useFonts, Literata_400Regular } from '@expo-google-fonts/literata';
 import { CityProvider } from './screens/CityContext';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+
+// Screens
 import WelcomeScreen from './screens/WelcomeScreen';
 import LoginScreen from './screens/LoginScreen';
 import SignUpScreen from './screens/SignUpScreen';
@@ -29,19 +31,18 @@ export default function App() {
     <CityProvider>
       <NavigationContainer>
         <Stack.Navigator
-          initialRouteName="Bootstrap"          // 👈 add this line
+          initialRouteName="Welcome" // 👈 Change this to test different screens
           screenOptions={{ headerShown: false }}
         >
           <Stack.Screen name="Bootstrap" component={BootstrapScreen} />
           <Stack.Screen name="CityPicker" component={CityPickerScreen} />
           <Stack.Screen name="Home" component={HomeScreen} />
-          {/* Leave the auth screens in the stack; you just won't start on them while testing */}
           <Stack.Screen name="Welcome" component={WelcomeScreen} />
-          <Stack.Screen name="Login"   component={LoginScreen} />
-          <Stack.Screen name="SignUp"  component={SignUpScreen} />
-          <Stack.Screen name="Verify"  component={VerifyCodeScreen} />
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="SignUp" component={SignUpScreen} />
+          <Stack.Screen name="Verify" component={VerifyCodeScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </CityProvider>
   );
-}  
+}

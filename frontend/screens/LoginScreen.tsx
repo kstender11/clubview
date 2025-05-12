@@ -26,7 +26,7 @@ export default function LoginScreen({ navigation }: any) {
       return;
     }
     setError('');
-    navigation.navigate('Home'); // Adjust this as needed
+    navigation.navigate('Bootstrap'); // Adjust this as needed
   };
 
   return (

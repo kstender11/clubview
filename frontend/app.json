@@ -15,21 +15,32 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.clubview.app",
-      "usesAppleSignIn": true
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "We use your location to show nearby bars and clubs."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.clubview.app"
+      "package": "com.clubview.app",
+      "permissions": ["ACCESS_FINE_LOCATION"]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-font",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "We use your location to show nearby bars and clubs.",
+          "locationAlwaysAndWhenInUsePermission": "We use your location to show nearby bars and clubs."
+        }
+      ]
     ]
   }
 }
