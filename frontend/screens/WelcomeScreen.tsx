@@ -8,7 +8,7 @@ export default function WelcomeScreen({ navigation }: any) {
       <View style={styles.container}>
         <View style={styles.top}>
           <Image
-            source={require('../assets/clubview-logo.png')}
+            source={require('../assets/clubview-icon.png')}
             style={styles.icon}
           />
           <Text style={styles.title}>ClubView</Text>

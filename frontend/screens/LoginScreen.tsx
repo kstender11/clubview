@@ -33,7 +33,7 @@ export default function LoginScreen({ navigation }: any) {
     <SafeAreaView style={styles.container}>
       <View style={styles.top}>
         <Image
-          source={require('../assets/clubview-logo.png')}
+          source={require('../assets/clubview-icon.png')}
           style={styles.icon}
         />
         <Text style={styles.header}>Log In</Text>
