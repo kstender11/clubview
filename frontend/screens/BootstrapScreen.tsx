@@ -1,14 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import * as Location from 'expo-location';
 import { useCity } from './CityContext';
 
 export default function BootstrapScreen({ navigation }: any) {
-  // 🐞 DEBUG ───────────────────────────────────────────────────────
   const id = useRef(Math.random().toString(36).slice(2, 7));
   console.log('🌐 CityContext ID (Bootstrap)', id.current);
-  //
-  const [phase, setPhase] = useState<'checking' | 'denied' | 'done'>('checking');
+
+  const [phase, setPhase] = useState<'checking' | 'done'>('checking');
   const { setSelectedCity, setUserLocation } = useCity();
 
   useEffect(() => {
@@ -21,10 +20,10 @@ export default function BootstrapScreen({ navigation }: any) {
       if (status === 'granted') {
         try {
           const loc = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Highest,   // ⬅️ ask iOS/Android for precise fix
+            accuracy: Location.Accuracy.Highest,
           });
           console.log('📌 precise location', loc.coords);
-          
+
           const coords = { lat: loc.coords.latitude, lng: loc.coords.longitude };
           setUserLocation(coords);
           console.log('📌 User location:', coords);
@@ -44,59 +43,41 @@ export default function BootstrapScreen({ navigation }: any) {
           return;
         } catch (err) {
           console.warn('⚠️ Reverse geocoding failed:', err);
-
-          setSelectedCity('Los Angeles'); // fallback city
-          setPhase('done');
-          console.log('🛑 Using fallback city, navigating to Home...');
-          navigation.replace('Home');
-          return;
         }
       }
 
-      console.log('❌ Location denied or error → show city picker');
-      setPhase('denied');
+      // Fallback if permission denied or reverse geocoding failed
+      console.log('❌ Location denied or error — using fallback city');
+      setSelectedCity('Los Angeles');
+      setUserLocation({ lat: 34.0522, lng: -118.2437 }); // LA coordinates
+      setPhase('done');
+      console.log('🚀 Navigating to Home with fallback location...');
+      navigation.replace('Home');
     })();
   }, []);
 
   console.log('📦 Render phase:', phase);
 
-  if (phase === 'checking') {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#9FDDE1" />
-        <Text style={styles.msg}>Getting your location…</Text>
-      </View>
-    );
-  }
-
-  if (phase === 'denied') {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.msg}>Location services are off.</Text>
-        <TouchableOpacity
-          style={styles.btn}
-          onPress={() => {
-            console.log('➡️ Navigating to CityPicker');
-            navigation.replace('CityPicker');
-          }}
-        >
-          <Text style={styles.btnText}>Select City Manually</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  // Fallback UI if something weird happens
   return (
     <View style={styles.center}>
-      <Text style={styles.msg}>Something went wrong…</Text>
+      <ActivityIndicator size="large" color="#9FDDE1" />
+      <Text style={styles.msg}>Getting your location…</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center', padding: 24 },
-  msg: { color: '#FFF', fontFamily: 'Literata_400Regular', marginTop: 16, textAlign: 'center' },
-  btn: { backgroundColor: '#9FDDE1', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 30, marginTop: 24 },
-  btnText: { color: '#000', fontWeight: 'bold' },
+  center: {
+    flex: 1,
+    backgroundColor: '#000',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  msg: {
+    color: '#FFF',
+    fontFamily: 'Literata_400Regular',
+    marginTop: 16,
+    textAlign: 'center',
+  },
 });

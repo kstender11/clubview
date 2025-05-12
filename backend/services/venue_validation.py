@@ -41,7 +41,7 @@ NEG_KW_PLAIN = {
     "pharmacy", "clinic", "hospital", "bank", "atm",
     "barber", "nail", "spa", "tanning", "market",
     "school", "academy", "daycare", "hardware", "laundromat",
-    "dry cleaner"
+    "dry cleaner", 
 }
 
 BEAUTY_TERMS = {"beauty", "hair", "nail", "barber", "spa"}

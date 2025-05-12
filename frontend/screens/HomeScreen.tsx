@@ -24,10 +24,8 @@ const PAGE_SIZE = 10;
 export default function HomeScreen() {
   const { selectedCity, userLocation } = useCity();
   const [venues, setVenues] = useState<Venue[]>([]);
-  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
 
   const { width } = useWindowDimensions();
@@ -35,25 +33,17 @@ export default function HomeScreen() {
   const CARD_W = width - 48;
   const COMPACT_H = 120;
 
-  const fetchVenues = useCallback(async (pageNum = 0, isRefreshing = false) => {
+  const fetchVenues = useCallback(async (isRefreshing = false) => {
     if (!userLocation || loading) return;
 
     setLoading(true);
     if (isRefreshing) setRefreshing(true);
 
     try {
-      const url = `${API_URL}?city=${selectedCity}&lat=${userLocation.lat}&lng=${userLocation.lng}&radius=50000&skip=${pageNum * PAGE_SIZE}&limit=${PAGE_SIZE}`;
+      const url = `${API_URL}?city=${selectedCity}&lat=${userLocation.lat}&lng=${userLocation.lng}&radius=50000&skip=0&limit=${PAGE_SIZE}`;
       const response = await fetch(url);
       const data: Venue[] = await response.json();
-
-      if (data.length < PAGE_SIZE) setHasMore(false);
-
-      if (isRefreshing || pageNum === 0) {
-        setVenues(data);
-      } else {
-        setVenues(prev => [...prev, ...data]);
-      }
-      setPage(pageNum);
+      setVenues(data);
     } catch (error) {
       console.error('Failed to fetch venues:', error);
     } finally {
@@ -63,19 +53,12 @@ export default function HomeScreen() {
   }, [userLocation, selectedCity, loading]);
 
   useEffect(() => {
-    if (userLocation) fetchVenues(0);
+    if (userLocation) fetchVenues();
   }, [userLocation, selectedCity]);
 
   const onRefresh = useCallback(() => {
-    setHasMore(true);
-    fetchVenues(0, true);
+    fetchVenues(true);
   }, [fetchVenues]);
-
-  const loadMore = useCallback(() => {
-    if (!loading && hasMore) {
-      fetchVenues(page + 1);
-    }
-  }, [loading, hasMore, page, fetchVenues]);
 
   const renderItem = ({ item }: { item: Venue }) => (
     <TouchableOpacity
@@ -117,7 +100,7 @@ export default function HomeScreen() {
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{
-          paddingTop: 8, // Reduced from insets.top + 8 since we handle it in ListHeaderComponent
+          paddingTop: 2,
           paddingBottom: 32,
           paddingHorizontal: 24
         }}
@@ -133,12 +116,10 @@ export default function HomeScreen() {
           ) : null
         }
         ListFooterComponent={
-          loading && !refreshing && venues.length > 0 ? (
+          loading && venues.length > 0 ? (
             <ActivityIndicator size="small" color="#9FDDE1" style={{ marginVertical: 20 }} />
           ) : null
         }
-        onEndReached={loadMore}
-        onEndReachedThreshold={0.5}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -182,13 +163,14 @@ const styles = StyleSheet.create({
   tagChip:{ backgroundColor:'#444', borderRadius:14, paddingHorizontal:10, paddingVertical:4 },
   tagText:{ color:'#9FDDE1', fontSize:12 },
   compactCard: {
-    backgroundColor: '#1C1C1E',
+    backgroundColor: '#1F1522',
     borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 18,
     overflow: 'hidden',
   },
+  
   compactInfo: {
     flex: 1,
     paddingHorizontal: 14,
@@ -217,19 +199,20 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
   },
   tagChipSmall: {
-    backgroundColor: '#444',
+    backgroundColor: '#333', // dark gray background
     borderRadius: 12,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     marginRight: 4,
     marginTop: 4,
   },
   tagTextSmall: {
-    color: '#9FDDE1',
-    fontSize: 10,
-  },
+    color: '#FFF', // white text
+    fontSize: 11,
+    fontWeight: '500',
+  },  
   headerContainer: {
-    paddingLeft: 24, // Matches contentContainerStyle paddingHorizontal
+    paddingLeft: 2, // Matches contentContainerStyle paddingHorizontal
     paddingBottom: 8,
     alignSelf: 'flex-start', // Ensures title stays left-aligned 
   },
