@@ -10,8 +10,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCity } from './CityContext'; // 🔑 import context hook
 
 export default function CityPickerScreen({ navigation }: any) {
-  const { setSelectedCity } = useCity(); // 🔑 grab setter from context
+  const { setSelectedCity, setUserLocation } = useCity(); // ✅ include setUserLocation
   const cities = ['Los Angeles', 'Scottsdale', 'San Francisco'];
+
+  // 🌍 Fallback coordinates for each city
+  const fallbackCoords: Record<string, { lat: number; lng: number }> = {
+    'Los Angeles':    { lat: 34.0522, lng: -118.2437 },
+    'San Francisco':  { lat: 37.7749, lng: -122.4194 },
+    'Scottsdale':     { lat: 33.4942, lng: -111.9261 },
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -26,8 +33,9 @@ export default function CityPickerScreen({ navigation }: any) {
             key={city}
             style={styles.cityButton}
             onPress={() => {
-              setSelectedCity(city);      // ✅ save to context
-              navigation.replace('Home'); // ✅ jump to Home
+              setSelectedCity(city);                     // ✅ save city
+              setUserLocation(fallbackCoords[city]);     // ✅ set fallback coords
+              navigation.replace('Home');                // ✅ go to Home
             }}
           >
             <Text style={styles.cityText}>📍 {city}</Text>

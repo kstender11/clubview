@@ -15,18 +15,10 @@ db = firestore.client()
 
 CITY = "Los Angeles"
 VENUES_TO_DELETE = [
-    "Sogno Toscano Restaurant & Cocktail Bar",
-    "Chili's Grill & Bar",
-    "Bao Dim Sum House",
-    "House of Meatballs",
-    "Ivanhoe Restaurant & Bar",
-    "Bambino's EOLA Restaurant & Bar",
-    "Sweet Fish Sushi Bar & Restaurant",
-    "Canoe House",
-    "Fiesta Martin Bar And Grill",
-    "The Spot Cafe & Lounge",
-    "The Culver Hotel Bar & Restaurant",
+    "Fleming’s Prime Steakhouse & Wine Bar",  # ← curly apostrophe
+    "Yard House",
 ]
+
 
 def delete_venue_by_name(name):
     venues_ref = db.collection("cities").document(CITY).collection("venues")
