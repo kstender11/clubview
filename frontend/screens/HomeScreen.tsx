@@ -7,10 +7,11 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import Feather from 'react-native-vector-icons/Feather';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useCity } from './CityContext';
+import { API_BASE_URL } from '@env';
 
 const filters = [ /* … same … */ ];
 const heroPick  = { /* … same … */ };
-const API_URL   = 'http://192.168.1.179:8000/api/venues/discover';
+const API_URL = `${API_BASE_URL}/api/venues/discover`;
 
 export default function HomeScreen() {
   const { selectedCity, userLocation } = useCity();
