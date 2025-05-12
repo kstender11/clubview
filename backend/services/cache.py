@@ -1,22 +1,36 @@
-import json, redis, hashlib, datetime as dt
-from core.config import get_settings
+from services.redis_cache import get_or_set
 
-cfg = get_settings()
+@router.get("/venues/discover")
+def discover_venues(
+    city: str,
+    lat: float,
+    lng: float,
+    category: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 10,
+):
+    def load_from_firestore():
+        venues_ref = db.collection("cities").document(city).collection("venues")
+        docs = venues_ref.stream()
+        all_venues = []
+        for doc in docs:
+            data = doc.to_dict()
+            venue_coords = data.get("location", {}).get("lat"), data.get("location", {}).get("lng")
+            if None in venue_coords:
+                continue
+            if category and category.lower() not in " ".join(data.get("categories", [])).lower():
+                continue
+            dist_meters = geodesic((lat, lng), venue_coords).meters
+            data["distance"] = dist_meters
+            all_venues.append(data | {"id": doc.id})
+        return all_venues
 
-# ✅ Make sure this points to your local Redis instance
-rds = redis.Redis(host="localhost", port=6379, decode_responses=True)
+    params = {
+        "city": city.strip().lower(),
+        "lat": round(lat, 3),  # keep hash stable
+        "lng": round(lng, 3),
+        "category": category or None
+    }
 
-def _key(name: str, params: dict) -> str:
-    h = hashlib.md5(json.dumps(params, sort_keys=True).encode()).hexdigest()
-    return f"{name}:{h}"
-
-def get_or_set(name: str, params: dict, ttl_hours: int, loader):
-    k = _key(name, params)
-    data = rds.get(k)
-    if data:
-        print(f"[CACHE HIT] {k}")
-        return json.loads(data)
-    print(f"[CACHE MISS] {k}")
-    value = loader()
-    rds.set(k, json.dumps(value), ex=ttl_hours * 3600)
-    return value
+    all_venues = get_or_set("venues", params, ttl_hours=6, loader=load_from_firestore)
+    return all_venues[skip: skip + limit]
