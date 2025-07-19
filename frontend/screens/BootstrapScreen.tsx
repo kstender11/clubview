@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import * as Location from 'expo-location';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCity } from './CityContext';
 
 export default function BootstrapScreen({ navigation }: any) {
@@ -35,10 +36,11 @@ export default function BootstrapScreen({ navigation }: any) {
           const city = place.city || fallbackCity;
 
           setSelectedCity(city);
+          await AsyncStorage.setItem('selectedCity', city);
+
           console.log('✅ Set city from GPS or fallback:', city);
 
           setPhase('done');
-          console.log('🚀 Navigating to Home...');
           navigation.replace('Home');
           return;
         } catch (err) {
@@ -46,13 +48,25 @@ export default function BootstrapScreen({ navigation }: any) {
         }
       }
 
-      // Fallback if permission denied or reverse geocoding failed
-      console.log('❌ Location denied or error — using fallback city');
-      setSelectedCity('Los Angeles');
-      setUserLocation({ lat: 34.0522, lng: -118.2437 }); // LA coordinates
+      // Location denied or error
+      const storedCity = await AsyncStorage.getItem('selectedCity');
+
+      if (storedCity) {
+        console.log(`✅ Found stored city: ${storedCity}`);
+        const fallbackCoords: Record<string, { lat: number; lng: number }> = {
+          'Los Angeles': { lat: 34.0522, lng: -118.2437 },
+          'San Francisco': { lat: 37.7749, lng: -122.4194 },
+          'Scottsdale': { lat: 33.4942, lng: -111.9261 },
+        };
+        setSelectedCity(storedCity);
+        setUserLocation(fallbackCoords[storedCity] || fallbackCoords['Los Angeles']);
+        navigation.replace('Home');
+      } else {
+        console.log('➡️ Navigating to CityPicker');
+        navigation.replace('CityPicker');
+      }
+
       setPhase('done');
-      console.log('🚀 Navigating to Home with fallback location...');
-      navigation.replace('Home');
     })();
   }, []);
 

@@ -43,6 +43,35 @@ def generate_fallback_summary(categories):
             return f"A {categories[0]}, {categories[1]}, and more in downtown LA."
     return "A nightlife venue in downtown LA."
 
+# ─── Foursquare Search (for missing fsq_id) ─────────────────
+def search_foursquare(name: str, lat: Optional[float] = None, lng: Optional[float] = None) -> Optional[str]:
+    url = "https://api.foursquare.com/v3/places/search"
+    headers = {
+        "Accept": "application/json",
+        "Authorization": cfg.FOURSQUARE_API_KEY,
+    }
+
+    params = {
+        "query": name,
+        "near": "Los Angeles",
+        "limit": 1,
+    }
+
+    if lat and lng:
+        params["ll"] = f"{lat},{lng}"
+
+    try:
+        res = requests.get(url, headers=headers, params=params, timeout=5)
+        res.raise_for_status()
+        data = res.json()
+        results = data.get("results")
+        if results and isinstance(results, list):
+            return results[0].get("fsq_id")
+    except Exception as e:
+        print(f"❌ Foursquare search error for '{name}': {e}")
+
+    return None
+
 # ─── Foursquare Enrichment ──────────────────────────────────
 def enrich_with_foursquare(fsq_id: str) -> dict:
     base_url = f"https://api.foursquare.com/v3/places/{fsq_id}"
@@ -55,7 +84,6 @@ def enrich_with_foursquare(fsq_id: str) -> dict:
 
     enrichment = {}
 
-    # ✨ Step 1: Place Details
     try:
         res = requests.get(base_url, headers=headers, timeout=5)
         res.raise_for_status()
@@ -72,13 +100,11 @@ def enrich_with_foursquare(fsq_id: str) -> dict:
     except Exception as e:
         print(f"❌ Foursquare details error for {fsq_id}: {e}")
 
-    # ✨ Step 2: Tips
     try:
         tips_res = requests.get(tips_url, headers=headers, timeout=5)
         tips_res.raise_for_status()
         tips_data = tips_res.json()
 
-        # Some Foursquare responses return a list directly
         if isinstance(tips_data, list):
             tips = [t["text"] for t in tips_data if "text" in t]
         else:
@@ -100,14 +126,25 @@ def enrich_all_venues(city: str = "Los Angeles"):
 
     for doc in docs:
         data = doc.to_dict()
+        name = data.get("name")
         fsq_id = data.get("foursquare_id")
+
+        # Search Foursquare if ID is missing
         if not fsq_id:
-            print(f"🚫 Skipping {data.get('name')} — no Foursquare ID.")
-            continue
+            print(f"🔎 Searching for {name}...")
+            lat = data.get("location", {}).get("lat")
+            lng = data.get("location", {}).get("lng")
+            fsq_id = search_foursquare(name, lat, lng)
+
+            if fsq_id:
+                doc.reference.update({"foursquare_id": fsq_id})
+                print(f"📌 Found Foursquare ID for {name}: {fsq_id}")
+            else:
+                print(f"🚫 Skipping {name} — no Foursquare match found.")
+                continue
 
         enriched = enrich_with_foursquare(fsq_id)
 
-        # Google summary/website fallback
         if data.get("place_id"):
             google_data = get_google_website_and_summary(data["place_id"])
             if not enriched.get("website") and google_data.get("website"):
@@ -115,7 +152,6 @@ def enrich_all_venues(city: str = "Los Angeles"):
             if not enriched.get("summary") and google_data.get("summary"):
                 enriched["summary"] = google_data["summary"]
 
-        # Fallback summary if still missing
         if not enriched.get("summary"):
             enriched["summary"] = generate_fallback_summary(
                 enriched.get("categories") or data.get("categories", [])
@@ -123,10 +159,10 @@ def enrich_all_venues(city: str = "Los Angeles"):
 
         if enriched:
             doc.reference.update(enriched)
-            print(f"✅ Updated {data.get('name')} with: {list(enriched.keys())}")
-            time.sleep(0.2)  # Optional rate limiting
+            print(f"✅ Updated {name} with: {list(enriched.keys())}")
+            time.sleep(0.2)  # Optional rate limit
         else:
-            print(f"⚠️  No enrichment data for {data.get('name')}.")
+            print(f"⚠️  No enrichment data for {name}.")
 
 # ─── Entry Point ────────────────────────────────────────────
 if __name__ == "__main__":

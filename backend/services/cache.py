@@ -9,13 +9,13 @@ def discover_venues(
     skip: int = 0,
     limit: int = 10,
 ):
-    def load_from_firestore():
-        venues_ref = db.collection("cities").document(city).collection("venues")
-        docs = venues_ref.stream()
-        all_venues = []
-        for doc in docs:
-            data = doc.to_dict()
-            venue_coords = data.get("location", {}).get("lat"), data.get("location", {}).get("lng")
+   def load_from_firestore():
+    venues_ref = db.collection("venues").where("city", "==", city)  # 👈 new flat structure
+    docs = venues_ref.stream()
+    all_venues = []
+    for doc in docs:
+        data = doc.to_dict()
+        venue_coords = data.get("location", {}).get("lat"), data.get("location", {}).get("lng")
             if None in venue_coords:
                 continue
             if category and category.lower() not in " ".join(data.get("categories", [])).lower():

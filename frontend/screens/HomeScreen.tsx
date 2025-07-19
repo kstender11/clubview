@@ -40,7 +40,7 @@ export default function HomeScreen() {
     if (isRefreshing) setRefreshing(true);
 
     try {
-      const url = `${API_URL}?city=${selectedCity}&lat=${userLocation.lat}&lng=${userLocation.lng}&radius=50000&skip=0&limit=${PAGE_SIZE}`;
+      const url = `${API_URL}?lat=${userLocation.lat}&lng=${userLocation.lng}&skip=0&limit=${PAGE_SIZE}`;
       const response = await fetch(url);
       const data: Venue[] = await response.json();
       setVenues(data);

@@ -15,16 +15,16 @@ from scripts.add_fsq_ids import fetch_fsq_id
 from scripts.add_hours import get_google_hours
 from scripts.add_instagram import find_instagram_link
 from services.foursquare import enrich_with_foursquare
-from services.venue_validation import validate_venue  # ✅ Added robust validator
+from services.venue_validation import validate_venue
 
 cfg = get_settings()
 
 # ──────────────────────── Helpers ─────────────────────────
 def distance_m(lat1, lng1, lat2, lng2):
     R = 6_371_000
-    dlat, dlng = radians(lat2-lat1), radians(lng2-lng1)
-    a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlng/2)**2
-    return int(2*R*atan2(sqrt(a), sqrt(1-a)))
+    dlat, dlng = radians(lat2 - lat1), radians(lng2 - lng1)
+    a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlng / 2) ** 2
+    return int(2 * R * atan2(sqrt(a), sqrt(1 - a)))
 
 def get_google_details(place_id: str) -> Dict[str, Any]:
     url = (
@@ -76,6 +76,9 @@ def simplify(place: Dict[str, Any], user_lat: float, user_lng: float) -> Dict[st
     elif 37.5 < v_lat < 38.5 and -123 < v_lng < -121:
         city = "San Francisco"
         state = "CA"
+    elif 37.4 < v_lat < 37.5 and -122.3 < v_lng < -122.1:
+        city = "Menlo Park"
+        state = "CA"
     else:
         city = "Unknown"
         state = "Unknown"
@@ -107,12 +110,10 @@ def upsert_and_enrich(doc: Dict[str, Any], city: str):
     ref = db.collection("cities").document(city).collection("venues").document(pid)
     snap = ref.get()
 
-    # Only add if not already in DB
     if not snap.exists:
         if not validate_venue(doc):
             print(f"🚫 Skipping {doc['name']} — did not pass nightlife validation.")
             return
-
         ref.set(doc)
         print(f"✅ Added {doc['name']} after validation")
         data = doc
@@ -123,11 +124,9 @@ def upsert_and_enrich(doc: Dict[str, Any], city: str):
             return
         print(f"↻ Found existing {data['name']}")
 
-    # ⏱ Check refresh window
     last = data.get("last_fsq_refresh")
     should_refresh_fsq = data.get("foursquare_id") and (not last or datetime.now(UTC) - last > FSQ_COOLDOWN)
 
-    # 🟢 Add missing Foursquare ID
     if not data.get("foursquare_id"):
         loc = data.get("location", {})
         fsq = fetch_fsq_id(data["name"], loc.get("lat"), loc.get("lng"))
@@ -136,7 +135,6 @@ def upsert_and_enrich(doc: Dict[str, Any], city: str):
             data["foursquare_id"] = fsq
             print(f"   • added Foursquare ID {fsq}")
 
-    # 🧠 Enrich with Foursquare if due
     if data.get("foursquare_id") and should_refresh_fsq:
         enrichment = enrich_with_foursquare(data["foursquare_id"])
         if enrichment:
@@ -145,34 +143,30 @@ def upsert_and_enrich(doc: Dict[str, Any], city: str):
             data.update(enrichment)
             print("   • enriched from Foursquare")
 
-    # 🌐 Enrich with Google data if needed
     if data.get("place_id") and (not data.get("website") or not data.get("summary")):
         gdata = get_google_details(data["place_id"])
         if gdata:
             ref.update(gdata)
             print("   • added website/summary from Google")
 
-    # 🕒 Add hours if missing
     if not data.get("hours"):
         hrs = get_google_hours(pid)
         if hrs:
             ref.update({"hours": hrs})
             print("   • added hours")
 
-    # 📷 Add Instagram if missing
     if not data.get("instagram_url") and data.get("website"):
         insta = find_instagram_link(data["website"])
         if insta:
             ref.update({"instagram_url": insta})
             print("   • added Instagram")
 
-
-# ────────────── Main CLI ─────────────────────
+# ────────────── CLI Entrypoint ─────────────────────
 def main():
     radius = 3000
     total = 0
 
-    for lat, lng in SF_GRID_COORDS:
+    for lat, lng in MENLO_GRID_COORDS:
         print(f"\n📍 Fetching at ({lat}, {lng}) with radius {radius}")
         places = fetch_google_nearby(lat, lng, radius)
         print(f"📑 Received {len(places)} results")
@@ -183,21 +177,13 @@ def main():
             total += 1
             time.sleep(0.2)
 
-    print(f"\n✅ Finished populating LA with {total} venues enriched.")
+    print(f"\n✅ Finished populating Menlo Park with {total} venues enriched.")
 
-SF_GRID_COORDS = [
-    (37.8030, -122.4376),  # Marina
-    (37.7985, -122.4352),  # Cow Hollow
-    (37.8009, -122.4106),  # North Beach
-    (37.7786, -122.4056),  # SoMa
-    (37.7599, -122.4350),  # Castro
-    (37.7599, -122.4148),  # Mission District
-    (37.7930, -122.4162),  # Nob Hill
-    (37.7946, -122.3999),  # Financial District
-    (37.7755, -122.4232),  # Hayes Valley
-    (37.7700, -122.4469),  # Haight
+MENLO_GRID_COORDS = [
+    (37.4540, -122.1817),  # Downtown Menlo Park
+    (37.4236, -122.1700),  # Stanford Shopping Center
+    (37.4258, -122.1979),  # Sharon Heights
 ]
-
 
 if __name__ == "__main__":
     main()
